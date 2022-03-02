@@ -27,6 +27,7 @@ __device__ float hardtan_activate_kernel(float x)
 }
 __device__ float linear_activate_kernel(float x){return x;}
 __device__ float logistic_activate_kernel(float x){return 1.f/(1.f + expf(-x));}
+__device__ float silu_activate_kernel(float x){return x /(1.f + expf(-x));}
 __device__ float loggy_activate_kernel(float x){return 2.f/(1.f + expf(-x)) - 1;}
 __device__ float relu_activate_kernel(float x){return x*(x>0);}
 __device__ float relu6_activate_kernel(float x) { return min_val_cmp(max_val_cmp(x, 0), 6); }
@@ -64,6 +65,7 @@ __device__ float hardtan_gradient_kernel(float x)
 }
 __device__ float linear_gradient_kernel(float x){return 1;}
 __device__ float logistic_gradient_kernel(float x){return (1-x)*x;}
+__device__ float silu_gradient_kernel(float x){return (1-x)*x + x / (1.f + expf(-x)) ;}
 __device__ float loggy_gradient_kernel(float x)
 {
     float y = (x+1.F)/2.F;
@@ -96,6 +98,8 @@ __device__ float activate_kernel(float x, ACTIVATION a)
             return linear_activate_kernel(x);
         case LOGISTIC:
             return logistic_activate_kernel(x);
+        case SILU:
+            return silu_activate_kernel(x);
         case LOGGY:
             return loggy_activate_kernel(x);
         case RELU:
@@ -135,6 +139,9 @@ __device__ float gradient_kernel(float x, ACTIVATION a)
         return linear_gradient_kernel(x);
     case LOGISTIC:
         return logistic_gradient_kernel(x);
+    case SILU:
+        return silu_gradient_kernel(x);
+
     case LOGGY:
         return loggy_gradient_kernel(x);
     case RELU:
@@ -325,6 +332,14 @@ __global__ void activate_array_logistic_kernel(float *x, int n)
     }
 }
 
+__global__ void activate_array_silu_kernel(float *x, int n)
+{
+    int index = blockIdx.x*blockDim.x + threadIdx.x;
+    if (index < n) {
+        x[index] = silu_activate_kernel(x[index]);
+    }
+}
+
 __global__ void activate_array_tanh_kernel(float *x, int n)
 {
     int index = blockIdx.x*blockDim.x + threadIdx.x;
@@ -459,6 +474,20 @@ __global__ void gradient_array_logistic_kernel(float *x, int n, float *delta)
     }
 }
 
+
+__global__ void gradient_array_silu_kernel(float *x, int n, float *delta)
+{
+    int index = blockIdx.x*blockDim.x + threadIdx.x;
+    if (index < n) {
+        delta[index] *= silu_gradient_kernel(x[index]);
+    }
+}
+
+
+
+
+
+
 __global__ void gradient_array_tanh_kernel(float *x, int n, float *delta)
 {
     int index = blockIdx.x*blockDim.x + threadIdx.x;
@@ -497,6 +526,8 @@ extern "C" void activate_array_ongpu(float *x, int n, ACTIVATION a)
     if (a == LINEAR) return;
     else if (a == LEAKY || a == REVLEAKY) activate_array_leaky_kernel << <num_blocks, BLOCK, 0, get_cuda_stream() >> >(x, n);
     else if (a == LOGISTIC) activate_array_logistic_kernel << <num_blocks, BLOCK, 0, get_cuda_stream() >> >(x, n);
+    else if (a == SILU) activate_array_silu_kernel << <num_blocks, BLOCK, 0, get_cuda_stream() >> >(x, n);
+
     else if (a == TANH) activate_array_tanh_kernel << <num_blocks, BLOCK, 0, get_cuda_stream() >> >(x, n);
     else if (a == HARDTAN) activate_array_hardtan_kernel << <num_blocks, BLOCK, 0, get_cuda_stream() >> >(x, n);
     else if (a == RELU) activate_array_relu_kernel << <num_blocks, BLOCK, 0, get_cuda_stream() >> >(x, n);
@@ -536,6 +567,7 @@ extern "C" void gradient_array_ongpu(float *x, int n, ACTIVATION a, float *delta
     else if (a == LEAKY) gradient_array_leaky_kernel << <num_blocks, BLOCK, 0, get_cuda_stream() >> >(x, n, delta);
     else if (a == REVLEAKY) gradient_array_revleaky_kernel << <num_blocks, BLOCK, 0, get_cuda_stream() >> >(x, n, delta);
     else if (a == LOGISTIC) gradient_array_logistic_kernel << <num_blocks, BLOCK, 0, get_cuda_stream() >> >(x, n, delta);
+    else if (a == SILU) gradient_array_silu_kernel << <num_blocks, BLOCK, 0, get_cuda_stream() >> >(x, n, delta);
     else if (a == TANH) gradient_array_tanh_kernel << <num_blocks, BLOCK, 0, get_cuda_stream() >> >(x, n, delta);
     else if (a == HARDTAN) gradient_array_hardtan_kernel << <num_blocks, BLOCK, 0, get_cuda_stream() >> >(x, n, delta);
     else if (a == RELU) gradient_array_relu_kernel << <num_blocks, BLOCK, 0, get_cuda_stream() >> >(x, n, delta);

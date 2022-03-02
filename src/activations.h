@@ -59,6 +59,9 @@ static inline float hardtan_activate(float x)
 }
 static inline float linear_activate(float x){return x;}
 static inline float logistic_activate(float x){return 1.f/(1.f + expf(-x));}
+
+static inline float silu_activate(float x){return x / (1.f + expf(-x));}
+
 static inline float loggy_activate(float x){return 2.f/(1.f + expf(-x)) - 1;}
 static inline float relu_activate(float x){return x*(x>0);}
 static inline float relu6_activate(float x) { return min_val_cmp(max_val_cmp(x, 0), 6); }
@@ -101,6 +104,7 @@ static inline float hardtan_gradient(float x)
 }
 static inline float linear_gradient(float x){return 1;}
 static inline float logistic_gradient(float x){return (1-x)*x;}
+static inline float silu_gradient(float x){return (1-x)*x*x+ 1.f/(1.f + expf(-x));}
 static inline float loggy_gradient(float x)
 {
     float y = (x+1.f)/2.f;

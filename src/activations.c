@@ -39,6 +39,10 @@ char *get_activation_string(ACTIVATION a)
             return "hardtan";
         case LHTAN:
             return "lhtan";
+            
+        case SILU:
+            return "silu";
+            
         default:
             break;
     }
@@ -70,6 +74,7 @@ ACTIVATION get_activation(char *s)
     if (strcmp(s, "leaky")==0) return LEAKY;
     if (strcmp(s, "tanh")==0) return TANH;
     if (strcmp(s, "stair")==0) return STAIR;
+    if (strcmp(s, "silu")==0) return SILU;
     fprintf(stderr, "Couldn't find activation function %s, going with ReLU\n", s);
     return RELU;
 }
@@ -108,6 +113,8 @@ float activate(float x, ACTIVATION a)
             return hardtan_activate(x);
         case LHTAN:
             return lhtan_activate(x);
+        case SILU:
+            return silu_activate(x);
     }
     return 0;
 }
@@ -126,6 +133,12 @@ void activate_array(float *x, const int n, const ACTIVATION a)
         #pragma omp parallel for
         for (i = 0; i < n; ++i) {
             x[i] = logistic_activate(x[i]);
+        }
+    }
+    else if (a == SILU) {
+        #pragma omp parallel for
+        for (i = 0; i < n; ++i) {
+            x[i] = silu_activate(x[i]);
         }
     }
     else {
@@ -312,6 +325,8 @@ float gradient(float x, ACTIVATION a)
             return linear_gradient(x);
         case LOGISTIC:
             return logistic_gradient(x);
+        case SILU:
+            return silu_gradient(x);
         case LOGGY:
             return loggy_gradient(x);
         case RELU:
